@@ -1,0 +1,24 @@
+port_a,port_b,nm
+Rotterdam,Antwerp,100
+Rotterdam,Houston,4900
+Rotterdam,Fujairah,6350
+Rotterdam,Ras Tanura,6700
+Rotterdam,Singapore,8300
+Rotterdam,Primorsk,1150
+Rotterdam,Marseille (Fos),1900
+Rotterdam,Ceyhan,3500
+Marseille (Fos),Ceyhan,1600
+Marseille (Fos),Fujairah,4500
+Marseille (Fos),Houston,5800
+Trieste,Ceyhan,1450
+Houston,Fujairah,12300
+Houston,Singapore,15300
+Fujairah,Singapore,3300
+Fujairah,Sikka,900
+Fujairah,Ras Tanura,420
+Fujairah,Ulsan,6000
+Ras Tanura,Singapore,3750
+Ras Tanura,Sikka,1100
+Ras Tanura,Ulsan,6400
+Singapore,Ulsan,2900
+Sikka,Singapore,2600

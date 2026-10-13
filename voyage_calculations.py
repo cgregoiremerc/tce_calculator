@@ -1,4 +1,4 @@
-"""Moteur de calcul unique pour les pages TCE et Lumpsum."""
+"""Single calculation engine for the TCE and Lumpsum pages."""
 from __future__ import annotations
 
 import os
@@ -10,7 +10,7 @@ from config import DISTANCES, FLAT_RATES, PORTS, Assumptions
 
 
 # --------------------------------------------------------------------------- #
-# Données d'entrée / sortie
+# Inputs / outputs
 # --------------------------------------------------------------------------- #
 @dataclass(frozen=True)
 class VoyageInputs:
@@ -58,7 +58,7 @@ class VoyageResult:
             "Bunker VLSFO": self.bunker_vlsfo_cost,
             "Bunker MGO (ECA)": self.bunker_mgo_cost,
             "EU ETS": self.ets_cost,
-            "Frais de port": self.port_costs,
+            "Port costs": self.port_costs,
         }
 
 
@@ -66,11 +66,11 @@ class VoyageResult:
 # Distances et flat rates
 # --------------------------------------------------------------------------- #
 def fetch_distance_api(a: str, b: str) -> Optional[float]:
-    """Branche ici l'API de distances (ex. Atobviac).
+    """Plug the distance API in here (e.g. Atobviac).
 
-    Lit DISTANCE_API_URL et, si besoin, DISTANCE_API_CA_BUNDLE (certificat
-    interne). La vérification SSL n'est JAMAIS désactivée. Renvoie None si
-    l'API n'est pas configurée ou en cas d'échec.
+    Reads DISTANCE_API_URL and, if needed, DISTANCE_API_CA_BUNDLE (internal
+    certificate). SSL verification is NEVER disabled. Returns None if the
+    API is not configured or the call fails.
     """
     url = os.environ.get("DISTANCE_API_URL")
     if not url:
@@ -88,7 +88,7 @@ def fetch_distance_api(a: str, b: str) -> Optional[float]:
 
 @lru_cache(maxsize=2048)
 def get_distance(a: str, b: str) -> Optional[float]:
-    """Distance en nm (0 si même port, None si inconnue). Mise en cache."""
+    """Distance in nm (0 if same port, None if unknown). Cached."""
     if a == b:
         return 0.0
     d = DISTANCES.get(frozenset((a, b)))
@@ -98,12 +98,12 @@ def get_distance(a: str, b: str) -> Optional[float]:
 
 
 def get_flat_rate(load_port: str, discharge_port: str) -> Optional[float]:
-    """Flat rate USD/t, ou None si la paire n'existe pas (saisie manuelle)."""
+    """Flat rate USD/t, or None if the pair is missing (manual entry)."""
     return FLAT_RATES.get((load_port, discharge_port))
 
 
 def eca_nm_for_leg(a: str, b: str, leg_nm: float) -> float:
-    """Milles en zone ECA sur un tronçon (approche des deux ports, plafonnée)."""
+    """Nautical miles inside an ECA on a leg (approach to both ports, capped at the leg length)."""
     if leg_nm <= 0:
         return 0.0
     pa, pb = PORTS.get(a, {}), PORTS.get(b, {})
@@ -117,7 +117,7 @@ def default_wait_days(port: str) -> float:
 
 
 # --------------------------------------------------------------------------- #
-# Calcul
+# Calculation
 # --------------------------------------------------------------------------- #
 def _leg_ets_coverage(a: str, b: str) -> float:
     ea, eb = PORTS.get(a, {}).get("eu", False), PORTS.get(b, {}).get("eu", False)
@@ -141,7 +141,7 @@ def compute_voyage(inp: VoyageInputs, a: Assumptions) -> VoyageResult:
     comm_pct = (a.address_commission + a.brokerage) / 100.0
     commissions = freight * comm_pct
 
-    # --- Jours ---
+    # --- Days ---
     bal_days_raw = inp.ballast_nm / (a.speed_ballast * 24)
     lad_days_raw = inp.laden_nm / (a.speed_laden * 24)
     bal_days = bal_days_raw * (1 + a.weather_margin)
@@ -152,7 +152,7 @@ def compute_voyage(inp: VoyageInputs, a: Assumptions) -> VoyageResult:
     port_days = days_load + days_disch
     total_days = sailing_days + port_days
 
-    # --- Soutes en mer (MGO sur la part ECA, VLSFO sinon) ---
+    # --- Sea bunkers (MGO on the ECA share, VLSFO otherwise) ---
     def leg_fuel(days: float, nm: float, eca_nm: float, cons: float) -> tuple[float, float]:
         share = min(1.0, eca_nm / nm) if nm > 0 else 0.0
         total = days * cons
@@ -161,7 +161,7 @@ def compute_voyage(inp: VoyageInputs, a: Assumptions) -> VoyageResult:
     v_b, m_b = leg_fuel(bal_days, inp.ballast_nm, inp.eca_ballast_nm, a.cons_ballast)
     v_l, m_l = leg_fuel(lad_days, inp.laden_nm, inp.eca_laden_nm, a.cons_laden)
 
-    # --- Soutes au port (MGO si port en ECA) ---
+    # --- Port bunkers (MGO if the port is in an ECA) ---
     def port_fuel(port: str, days: float) -> tuple[float, float]:
         t = days * a.cons_port
         return (0.0, t) if PORTS.get(port, {}).get("eca") else (t, 0.0)
@@ -211,7 +211,7 @@ def _costs_excl_commission(r: VoyageResult) -> float:
 
 
 def breakeven_ws(inp: VoyageInputs, a: Assumptions, target_tce: float = 0.0) -> Optional[float]:
-    """WS pour atteindre `target_tce` (USD/jour). La TCE est linéaire en WS."""
+    """WS needed to reach `target_tce` (USD/day). TCE is linear in WS."""
     if inp.flat_rate is None or inp.lumpsum is not None:
         return None
     r = compute_voyage(inp, a)
@@ -229,7 +229,7 @@ def breakeven_lumpsum(inp: VoyageInputs, a: Assumptions, target_tce: float = 0.0
 
 
 def sensitivity_matrix(inp: VoyageInputs, a: Assumptions, ws_values, vlsfo_values):
-    """Matrice TCE : lignes = VLSFO, colonnes = WS (mode TCE)."""
+    """TCE matrix: rows = VLSFO, columns = WS (TCE mode)."""
     import pandas as pd
 
     rows = {}

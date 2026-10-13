@@ -54,3 +54,14 @@ def test_sensitivity_shape():
     assert df.shape == (2, 3)
     assert df.iloc[0, 2] > df.iloc[0, 0]      # WS plus haut -> TCE plus haute
     assert df.iloc[0, 1] > df.iloc[1, 1]      # VLSFO plus bas -> TCE plus haute
+
+
+def test_data_tables_consistent():
+    from config import DISTANCES, FLAT_RATES, PORTS, ROUTES, VESSELS, latest_prices
+    for pair in DISTANCES:
+        assert pair <= set(PORTS)
+    for a, b in FLAT_RATES:
+        assert a in PORTS and b in PORTS
+    for r in ROUTES.values():
+        assert r["vessel"] in VESSELS and {r["ballast"], r["load"], r["discharge"]} <= set(PORTS)
+    assert latest_prices()["vlsfo"] > 0

@@ -1,113 +1,98 @@
-"""Configuration unique : hypothèses, ports, distances et flat rates.
+"""Configuration: default assumptions + loading of the CSV tables in data/.
 
-Tout ce qui était dupliqué entre les pages vit ici. Les valeurs de distances
-et de flat rates ci-dessous sont ILLUSTRATIVES : remplace-les par tes données
-(ou branche l'API de distances, cf. voyage_calculations.fetch_distance_api).
+To update the data, just edit the CSV files (Excel opens them fine), then
+`git add . && git commit && git push`. The values shipped are ILLUSTRATIVE.
+
+  data/ports.csv       country, EU/ECA flags, ECA miles, port costs, default wait days
+  data/distances.csv   distances between ports (nm, symmetric)
+  data/flat_rates.csv  Worldscale flat rates (USD/t) per load -> discharge pair
+  data/vessels.csv     vessel profiles (MR / LR1 / LR2)
+  data/prices.csv      bunker and EUA prices (latest row by date is used)
+  data/routes.csv      favourite routes (ports + vessel)
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
+
+import pandas as pd
+
+DATA_DIR = Path(__file__).resolve().parent / "data"
 
 
 @dataclass(frozen=True)
 class Assumptions:
-    # Vitesse (noeuds) et consommation en mer (t/jour)
+    # Speed (knots) and sea consumption (t/day): overridden by the vessel profile
     speed_laden: float = 13.0
     speed_ballast: float = 13.5
-    cons_laden: float = 38.0
-    cons_ballast: float = 34.0
-    cons_port: float = 6.0           # t/jour au port (y compris attente)
-    # Marge météo appliquée aux jours de mer (était un `* 1.1` caché)
-    weather_margin: float = 0.10
-    # Durées au port (jours)
+    cons_laden: float = 40.0
+    cons_ballast: float = 36.0
+    cons_port: float = 8.0           # t/day in port (incl. waiting)
+    weather_margin: float = 0.10     # weather margin on sea days
     load_days: float = 1.5
     discharge_days: float = 2.0
-    # Prix soute (USD/t)
-    vlsfo_price: float = 600.0
-    mgo_price: float = 800.0
-    # Frais de port (USD)
+    vlsfo_price: float = 600.0       # USD/t
+    mgo_price: float = 800.0         # USD/t
     port_cost_load: float = 50_000.0
     port_cost_discharge: float = 50_000.0
-    # Commissions (% du fret brut)
-    address_commission: float = 3.75
-    brokerage: float = 1.25
-    # EU ETS
+    address_commission: float = 3.75  # % of gross freight
+    brokerage: float = 1.25           # % of gross freight
     ets_enabled: bool = True
-    eua_price: float = 70.0          # EUR/tCO2 converti en USD ci-dessous
+    eua_price: float = 70.0           # EUR/tCO2
     eur_usd: float = 1.08
-    ets_phase_in: float = 1.0        # 40 % en 2024, 70 % en 2025, 100 % dès 2026
-    co2_factor_vlsfo: float = 3.114  # tCO2 / t fuel
+    ets_phase_in: float = 1.0         # 100% from 2026
+    co2_factor_vlsfo: float = 3.114   # tCO2 / t fuel
     co2_factor_mgo: float = 3.206
 
 
 DEFAULT_ASSUMPTIONS = Assumptions()
+DEFAULT_WS = 100.0
+DEFAULT_VESSEL = "LR2"
+DEFAULT_PORT_COST = 50_000.0
 
-# Jours d'attente suggérés par port (était codé en dur : 14 j pour Singapour).
-# Valeur par défaut éditable dans l'interface.
-DEFAULT_WAIT_DAYS: dict[str, float] = {"Singapore": 14.0}
 
-# Ports : pays, appartenance EU/EEE (ETS), port situé en zone ECA,
-# et milles nautiques d'approche dans la zone ECA.
+def _csv(name: str) -> pd.DataFrame:
+    return pd.read_csv(DATA_DIR / name, skipinitialspace=True).dropna(how="all")
+
+
+# --- Ports -------------------------------------------------------------------
+_ports = _csv("ports.csv")
 PORTS: dict[str, dict] = {
-    "Rotterdam": {"country": "NL", "eu": True, "eca": True, "eca_nm": 300},
-    "Antwerp": {"country": "BE", "eu": True, "eca": True, "eca_nm": 250},
-    "Marseille (Fos)": {"country": "FR", "eu": True, "eca": False, "eca_nm": 0},
-    "Trieste": {"country": "IT", "eu": True, "eca": False, "eca_nm": 0},
-    "Primorsk": {"country": "RU", "eu": False, "eca": True, "eca_nm": 450},
-    "Ceyhan": {"country": "TR", "eu": False, "eca": False, "eca_nm": 0},
-    "Houston": {"country": "US", "eu": False, "eca": True, "eca_nm": 200},
-    "Fujairah": {"country": "AE", "eu": False, "eca": False, "eca_nm": 0},
-    "Ras Tanura": {"country": "SA", "eu": False, "eca": False, "eca_nm": 0},
-    "Jubail": {"country": "SA", "eu": False, "eca": False, "eca_nm": 0},
-    "Luanda": {"country": "AO", "eu": False, "eca": False, "eca_nm": 0},
-    "Sikka": {"country": "IN", "eu": False, "eca": False, "eca_nm": 0},
-    "Singapore": {"country": "SG", "eu": False, "eca": False, "eca_nm": 0},
-    "Ulsan": {"country": "KR", "eu": False, "eca": False, "eca_nm": 0},
+    r.port: {"country": r.country, "eu": bool(int(r.eu)), "eca": bool(int(r.eca)),
+             "eca_nm": float(r.eca_nm)}
+    for r in _ports.itertuples()
 }
 PORT_OPTIONS: list[str] = sorted(PORTS)
-
-# Distances en milles nautiques (symétriques). ILLUSTRATIF.
-_DISTANCES = {
-    ("Rotterdam", "Antwerp"): 100,
-    ("Rotterdam", "Houston"): 4900,
-    ("Rotterdam", "Fujairah"): 6350,
-    ("Rotterdam", "Ras Tanura"): 6700,
-    ("Rotterdam", "Singapore"): 8300,
-    ("Rotterdam", "Primorsk"): 1150,
-    ("Rotterdam", "Marseille (Fos)"): 1900,
-    ("Rotterdam", "Ceyhan"): 3500,
-    ("Marseille (Fos)", "Ceyhan"): 1600,
-    ("Marseille (Fos)", "Fujairah"): 4500,
-    ("Marseille (Fos)", "Houston"): 5800,
-    ("Trieste", "Ceyhan"): 1450,
-    ("Houston", "Fujairah"): 12300,
-    ("Houston", "Singapore"): 15300,
-    ("Fujairah", "Singapore"): 3300,
-    ("Fujairah", "Sikka"): 900,
-    ("Fujairah", "Ras Tanura"): 420,
-    ("Fujairah", "Ulsan"): 6000,
-    ("Ras Tanura", "Singapore"): 3750,
-    ("Ras Tanura", "Sikka"): 1100,
-    ("Ras Tanura", "Ulsan"): 6400,
-    ("Singapore", "Ulsan"): 2900,
-    ("Sikka", "Singapore"): 2600,
+PORT_COSTS: dict[str, float] = {r.port: float(r.port_cost) for r in _ports.itertuples()}
+DEFAULT_WAIT_DAYS: dict[str, float] = {
+    r.port: float(r.wait_days) for r in _ports.itertuples() if float(r.wait_days) > 0
 }
-DISTANCES: dict[frozenset, float] = {frozenset(k): float(v) for k, v in _DISTANCES.items()}
 
-# Flat rates (USD/t). ILLUSTRATIF. Les paires absentes (Luanda, Jubail...) renvoient
-# None : l'interface demande alors une saisie manuelle au lieu de planter.
-_FLAT_RATES = {
-    ("Fujairah", "Singapore"): 12.5,
-    ("Ras Tanura", "Singapore"): 14.0,
-    ("Ras Tanura", "Ulsan"): 17.5,
-    ("Fujairah", "Sikka"): 7.5,
-    ("Rotterdam", "Houston"): 18.0,
-    ("Houston", "Rotterdam"): 17.0,
-    ("Primorsk", "Rotterdam"): 9.5,
-    ("Ceyhan", "Marseille (Fos)"): 9.0,
-    ("Ceyhan", "Trieste"): 8.5,
+# --- Distances / flat rates --------------------------------------------------
+DISTANCES: dict[frozenset, float] = {
+    frozenset((r.port_a, r.port_b)): float(r.nm) for r in _csv("distances.csv").itertuples()
 }
-FLAT_RATES: dict[tuple, float] = dict(_FLAT_RATES)
+FLAT_RATES: dict[tuple, float] = {
+    (r.load_port, r.discharge_port): float(r.flat_rate) for r in _csv("flat_rates.csv").itertuples()
+}
 
-DEFAULT_CARGO_MT = 100_000
-DEFAULT_WS = 100.0
+# --- Vessels / routes --------------------------------------------------------
+VESSELS: dict[str, dict] = {
+    r.vessel: {"cargo_mt": float(r.cargo_mt), "speed_laden": float(r.speed_laden),
+               "speed_ballast": float(r.speed_ballast), "cons_laden": float(r.cons_laden),
+               "cons_ballast": float(r.cons_ballast), "cons_port": float(r.cons_port)}
+    for r in _csv("vessels.csv").itertuples()
+}
+ROUTES: dict[str, dict] = {
+    r.name: {"ballast": r.ballast, "load": r.load, "discharge": r.discharge, "vessel": r.vessel}
+    for r in _csv("routes.csv").itertuples()
+}
+
+
+def latest_prices() -> dict:
+    """Latest dated row of prices.csv : {date, vlsfo, mgo, eua_eur}."""
+    df = _csv("prices.csv")
+    df["date"] = pd.to_datetime(df["date"])
+    row = df.sort_values("date").iloc[-1]
+    return {"date": row["date"].date(), "vlsfo": float(row["vlsfo"]),
+            "mgo": float(row["mgo"]), "eua_eur": float(row["eua_eur"])}

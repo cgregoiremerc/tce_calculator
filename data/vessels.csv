@@ -1,0 +1,4 @@
+vessel,cargo_mt,speed_laden,speed_ballast,cons_laden,cons_ballast,cons_port
+MR,37000,13.0,13.5,26.0,23.0,6.0
+LR1,55000,13.0,13.5,32.0,29.0,7.0
+LR2,75000,13.0,13.5,40.0,36.0,8.0

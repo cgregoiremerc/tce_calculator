@@ -1,10 +1,17 @@
 # Voyage Dashboard v2 (TCE / Lumpsum)
 
-Lancer : `pip install -r requirements.txt` puis `streamlit run Home.py`
-Tests : `python -m pytest tests`
+Run: `pip install -r requirements.txt` then `streamlit run Home.py`
+(Home.py is only the router; the landing page is the TCE Calculator.)
+Tests: `python -m pytest tests`
 
-- `config.py` : hypothèses, ports, distances, flat rates (valeurs ILLUSTRATIVES à remplacer par les vôtres).
-- `voyage_calculations.py` : `compute_voyage`, break-even WS/lumpsum, matrice de sensibilité.
-- `ui.py` : formulaire et rendu partagés par les deux pages.
-- Distances : `get_distance` est mise en cache. Pour brancher l'API, définir `DISTANCE_API_URL`
-  (et `DISTANCE_API_CA_BUNDLE` pour le certificat interne) ; la vérification SSL n'est jamais désactivée.
+- `voyage_calculations.py`: `compute_voyage`, WS / lumpsum break-even, sensitivity matrix.
+- `ui.py`: form and rendering shared by the two pages.
+- `config.py`: default assumptions and CSV loading.
+- Distance API: `get_distance` is cached. To plug it in, set `DISTANCE_API_URL`
+  (and `DISTANCE_API_CA_BUNDLE` for the internal certificate); SSL verification is never disabled.
+
+## Updating the data
+Everything lives in `data/` (CSV, editable with Excel): `prices.csv` (add one row per day),
+`flat_rates.csv`, `distances.csv`, `ports.csv` (port costs, wait days, ECA), `vessels.csv`
+(MR/LR1/LR2 profiles) and `routes.csv` (favourite routes). All values shipped are illustrative.
+Then `git add . && git commit && git push`.

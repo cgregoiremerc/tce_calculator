@@ -1,0 +1,15 @@
+port,country,eu,eca,eca_nm,port_cost,wait_days
+Rotterdam,NL,1,1,300,60000,0
+Antwerp,BE,1,1,250,55000,0
+Marseille (Fos),FR,1,0,0,50000,0
+Trieste,IT,1,0,0,45000,0
+Primorsk,RU,0,1,450,40000,0
+Ceyhan,TR,0,0,0,45000,0
+Houston,US,0,1,200,90000,0
+Fujairah,AE,0,0,0,35000,0
+Ras Tanura,SA,0,0,0,40000,0
+Jubail,SA,0,0,0,40000,0
+Luanda,AO,0,0,0,70000,0
+Sikka,IN,0,0,0,50000,0
+Singapore,SG,0,0,0,55000,14
+Ulsan,KR,0,0,0,60000,0
